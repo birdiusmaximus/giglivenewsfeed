@@ -76,7 +76,17 @@ function generateId(url: string): string {
 
 function cleanDescription(raw: string | undefined): string {
   if (!raw) return '';
-  return raw.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 600);
+  // Preserve paragraph structure: convert closing block tags to newlines
+  // before stripping the rest, so the preview can render it as paragraphs.
+  return raw
+    .replace(/<\/(p|div|h[1-6]|li|blockquote)>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .trim()
+    .slice(0, 2000);
 }
 
 /**
@@ -132,7 +142,7 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[]): Promise<Artic
         id: generateId(url),
         title,
         url,
-        description: cleanDescription(item.contentSnippet ?? item.content),
+        description: cleanDescription(item['content:encoded'] ?? item.content ?? item.contentSnippet),
         imageUrl: extractImage(item),
         publishedAt: pubDate.toISOString(),
         source: feed.id,
@@ -186,6 +196,9 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[]): Promise<Artic
   }
 
   return enriched.filter((a) => {
+    // Articles with embeddable video bypass the unique-image requirement —
+    // the video itself is the unique visual content.
+    if (a.videoUrl) return true;
     if (!a.imageUrl) return false;
     if (GENERIC_IMAGE_PATTERNS.some((re) => re.test(a.imageUrl!))) return false;
     if ((imageCounts.get(a.imageUrl) ?? 0) > 1) return false;

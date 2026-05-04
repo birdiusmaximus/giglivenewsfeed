@@ -41,6 +41,8 @@ export default function ArticlePreview({ article }: Props) {
   const fullDate = format(new Date(article.publishedAt), 'EEEE, MMMM d');
 
   const showImage = article.imageUrl && !imageFailed;
+  const hasVideo = !!article.videoUrl;
+  const isIframeVideo = article.videoType === 'youtube' || article.videoType === 'vimeo';
 
   return (
     <section className="flex-1 bg-white dark:bg-dusk rounded-lg lg:h-full flex flex-col overflow-hidden min-h-[500px] border border-night/5 dark:border-paper/5">
@@ -71,8 +73,34 @@ export default function ArticlePreview({ article }: Props) {
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-7">
-          {/* Hero image */}
-          {showImage ? (
+          {/* Hero — video takes priority, then image, then gradient fallback */}
+          {hasVideo ? (
+            <div className="aspect-video rounded-lg overflow-hidden bg-black mb-6 relative">
+              {isIframeVideo ? (
+                <iframe
+                  src={article.videoUrl}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title={article.title}
+                />
+              ) : (
+                <video
+                  src={article.videoUrl}
+                  controls
+                  className="w-full h-full object-cover"
+                  poster={article.imageUrl}
+                />
+              )}
+              <div
+                aria-hidden
+                className="absolute top-0 left-0 right-0 h-1 z-10 pointer-events-none"
+                style={{ backgroundColor: article.sourceColor }}
+              />
+            </div>
+          ) : showImage ? (
             <div className="aspect-[16/10] rounded-lg overflow-hidden bg-night/5 dark:bg-paper/5 mb-6 relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -147,11 +175,13 @@ export default function ArticlePreview({ article }: Props) {
             {article.title}
           </h1>
 
-          {/* Description */}
+          {/* Description — paragraph breaks preserved via whitespace-pre-line */}
           {article.description && (
-            <p className="text-night/65 dark:text-paper/65 text-base leading-relaxed mb-7">
-              {article.description}
-            </p>
+            <div className="text-night/70 dark:text-paper/70 text-[15px] leading-relaxed mb-7 whitespace-pre-line space-y-3">
+              {article.description.split(/\n{2,}/).map((para, i) => (
+                <p key={i}>{para.trim()}</p>
+              ))}
+            </div>
           )}
 
           {/* Primary CTA */}

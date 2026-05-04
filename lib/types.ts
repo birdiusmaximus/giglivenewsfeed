@@ -20,12 +20,17 @@ export const CATEGORIES: { id: Category; label: string }[] = [
   { id: 'events',           label: 'Events' },
 ];
 
+export type VideoType = 'youtube' | 'vimeo' | 'video';
+
 export interface Article {
   id: string;
   title: string;
   url: string;
   description: string;
   imageUrl?: string;
+  /** Embeddable video URL (YouTube/Vimeo iframe URL or direct mp4) */
+  videoUrl?: string;
+  videoType?: VideoType;
   publishedAt: string;
   source: string;
   sourceName: string;

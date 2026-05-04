@@ -28,7 +28,70 @@ export async function resolveUrl(url: string): Promise<string> {
   return url;
 }
 
-type OgMeta = { imageUrl?: string; description?: string };
+type VideoType = 'youtube' | 'vimeo' | 'video';
+type OgMeta = {
+  imageUrl?: string;
+  description?: string;
+  videoUrl?: string;
+  videoType?: VideoType;
+};
+
+/** Normalise protocol-relative + http URLs */
+function normalizeMediaUrl(url: string): string {
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('http://')) return url.replace(/^http:/, 'https:');
+  return url;
+}
+
+/**
+ * Look for embeddable video signals in HTML — iframes, og:video, twitter:player.
+ * Returns the first match in priority order.
+ */
+function extractVideo(html: string): { url: string; type: VideoType } | null {
+  // 1. YouTube iframe (most common embed format)
+  const ytIframe = html.match(
+    /<iframe[^>]+src=["']([^"']*(?:youtube\.com\/embed|youtube-nocookie\.com\/embed)\/[A-Za-z0-9_-]+[^"']*)["']/i
+  );
+  if (ytIframe) return { url: normalizeMediaUrl(ytIframe[1]), type: 'youtube' };
+
+  // 2. Vimeo iframe
+  const vmIframe = html.match(
+    /<iframe[^>]+src=["']([^"']*player\.vimeo\.com\/video\/\d+[^"']*)["']/i
+  );
+  if (vmIframe) return { url: normalizeMediaUrl(vmIframe[1]), type: 'vimeo' };
+
+  // 3. og:video / og:video:url / og:video:secure_url (often direct mp4)
+  const ogVideo = html.match(
+    /<meta[^>]+property=["']og:video(?::secure_url|:url)?["'][^>]+content=["']([^"']+)["']/i
+  );
+  if (ogVideo) {
+    const u = normalizeMediaUrl(ogVideo[1]);
+    if (/youtube\.com|youtu\.be/.test(u)) {
+      const id = u.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+      if (id) return { url: `https://www.youtube.com/embed/${id[1]}`, type: 'youtube' };
+    }
+    if (/vimeo\.com/.test(u)) {
+      const id = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+      if (id) return { url: `https://player.vimeo.com/video/${id[1]}`, type: 'vimeo' };
+    }
+    if (/\.mp4($|\?)/i.test(u)) return { url: u, type: 'video' };
+  }
+
+  // 4. twitter:player (often a player URL)
+  const twPlayer = html.match(
+    /<meta[^>]+name=["']twitter:player["'][^>]+content=["']([^"']+)["']/i
+  );
+  if (twPlayer) {
+    const u = normalizeMediaUrl(twPlayer[1]);
+    if (/youtube\.com|youtu\.be/.test(u)) {
+      const id = u.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+      if (id) return { url: `https://www.youtube.com/embed/${id[1]}`, type: 'youtube' };
+    }
+    if (/player\.vimeo\.com/.test(u)) return { url: u, type: 'vimeo' };
+  }
+
+  return null;
+}
 
 /**
  * Fetch a URL and extract OG meta tags from the HTML.
@@ -83,11 +146,15 @@ export async function fetchOgMeta(url: string, timeoutMs = 8000): Promise<OgMeta
     ];
     for (const re of descRegexes) {
       const m = html.match(re);
-      if (m?.[1]) { description = m[1].trim().slice(0, 600); break; }
+      if (m?.[1]) { description = m[1].trim().slice(0, 2000); break; }
     }
 
+    // --- Video (iframes, og:video, twitter:player) ---
+    const video = extractVideo(html);
+
     // Cheerio for anything the regex missed + article body extraction
-    if (!imageUrl || !description || description.length < 120) {
+    // Always run if description is short (< 200 chars) so we get richer excerpts
+    if (!imageUrl || !description || description.length < 200) {
       const $ = cheerio.load(html);
 
       if (!imageUrl) {
@@ -109,13 +176,12 @@ export async function fetchOgMeta(url: string, timeoutMs = 8000): Promise<OgMeta
         }
       }
 
-      if (!description || description.length < 120) {
-        // Try meta tags first
+      if (!description || description.length < 200) {
         const metaDesc = description ??
           $('meta[property="og:description"]').attr('content') ??
           $('meta[name="description"]').attr('content');
 
-        // Extract body paragraphs for a richer excerpt
+        // Extract body paragraphs for a richer multi-paragraph excerpt
         const bodyParas: string[] = [];
         const bodySelectors = ['article p', 'main p', '.post-content p', '.article-body p', '.entry-content p', '.story p'];
         for (const sel of bodySelectors) {
@@ -123,29 +189,35 @@ export async function fetchOgMeta(url: string, timeoutMs = 8000): Promise<OgMeta
             const text = $(el).text().replace(/\s+/g, ' ').trim();
             if (text.length > 60) bodyParas.push(text);
           });
-          if (bodyParas.length >= 3) break;
+          if (bodyParas.length >= 6) break;
         }
 
         if (bodyParas.length > 0) {
-          // Combine up to ~600 chars of article text
+          // Join with double-newline to preserve paragraph structure
           let excerpt = '';
           for (const p of bodyParas) {
-            if (excerpt.length + p.length > 600) break;
-            excerpt += (excerpt ? ' ' : '') + p;
+            const sep = excerpt ? '\n\n' : '';
+            if (excerpt.length + sep.length + p.length > 2000) break;
+            excerpt += sep + p;
           }
-          // Prefer body text if it's longer/richer than the meta description
+          // Prefer body excerpt when it's substantially richer than meta desc
           if (excerpt.length > (metaDesc?.length ?? 0)) {
-            description = excerpt.slice(0, 600);
+            description = excerpt.slice(0, 2000);
           } else if (metaDesc && metaDesc.length >= 20) {
-            description = metaDesc.trim().slice(0, 600);
+            description = metaDesc.trim().slice(0, 2000);
           }
         } else if (metaDesc && metaDesc.length >= 20) {
-          description = metaDesc.trim().slice(0, 600);
+          description = metaDesc.trim().slice(0, 2000);
         }
       }
     }
 
-    return { imageUrl, description };
+    return {
+      imageUrl,
+      description,
+      videoUrl: video?.url,
+      videoType: video?.type,
+    };
   } catch {
     return {};
   }
@@ -200,11 +272,18 @@ function isWeakDescription(desc: string, title: string): boolean {
  * - Resolves Google News URLs to the real source URL (and updates `url`)
  * - Fetches og:image for items missing one
  * - Fetches og:description when the RSS description is missing or low-quality
+ * - Extracts embeddable video URLs (YouTube/Vimeo iframes, og:video)
  */
-export async function enrichWithOgImages<T extends { url: string; imageUrl?: string; description?: string; title?: string }>(
-  items: T[],
-  concurrency = 6
-): Promise<T[]> {
+export async function enrichWithOgImages<
+  T extends {
+    url: string;
+    imageUrl?: string;
+    description?: string;
+    title?: string;
+    videoUrl?: string;
+    videoType?: VideoType;
+  }
+>(items: T[], concurrency = 6): Promise<T[]> {
   const queue = items.map((item, i) => ({ item, index: i }));
   const out: T[] = new Array(items.length);
 
@@ -220,12 +299,17 @@ export async function enrichWithOgImages<T extends { url: string; imageUrl?: str
 
       const needsImage = !updatedItem.imageUrl;
       const needsDesc = !updatedItem.description ||
-        isWeakDescription(updatedItem.description, updatedItem.title ?? '');
+        isWeakDescription(updatedItem.description, updatedItem.title ?? '') ||
+        updatedItem.description.length < 200;
+      const needsVideo = !updatedItem.videoUrl;
 
-      if (needsImage || needsDesc) {
+      if (needsImage || needsDesc || needsVideo) {
         const meta = await fetchOgMeta(resolvedUrl);
         if (needsImage && meta.imageUrl) updatedItem = { ...updatedItem, imageUrl: meta.imageUrl };
         if (needsDesc && meta.description) updatedItem = { ...updatedItem, description: meta.description };
+        if (needsVideo && meta.videoUrl) {
+          updatedItem = { ...updatedItem, videoUrl: meta.videoUrl, videoType: meta.videoType };
+        }
       }
 
       // Verify the image is actually reachable — broken URLs (403, 404, redirects
