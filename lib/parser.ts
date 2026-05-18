@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import type { Article } from './types';
 import { FEEDS, type FeedSource } from './feeds';
 import { detectCategory } from './categories';
-import { isCurrentWeek } from './weekUtils';
+import { isCurrentWeek, isInWeek } from './weekUtils';
 import { enrichWithOgImages } from './ogImage';
 
 type RSSItem = {
@@ -105,7 +105,17 @@ export async function fetchAllArticles(): Promise<Article[]> {
   return fetchArticlesFromFeeds(FEEDS);
 }
 
-export async function fetchArticlesFromFeeds(feeds: FeedSource[]): Promise<Article[]> {
+/**
+ * Fetch articles for a specific ISO week (e.g. '2026-W20'). Used by the
+ * backfill endpoint to recover weeks that weren't archived in real time.
+ * RSS feeds typically retain 2-4 weeks of history, so recent past weeks
+ * are usually recoverable.
+ */
+export async function fetchArticlesForWeek(weekId: string): Promise<Article[]> {
+  return fetchArticlesFromFeeds(FEEDS, weekId);
+}
+
+export async function fetchArticlesFromFeeds(feeds: FeedSource[], weekId?: string): Promise<Article[]> {
   if (feeds.length === 0) return [];
 
   const results = await Promise.allSettled(
@@ -128,7 +138,8 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[]): Promise<Artic
         ? new Date(item.pubDate)
         : null;
       if (!pubDate || isNaN(pubDate.getTime())) continue;
-      if (!isCurrentWeek(pubDate)) continue;
+      const matchesWeek = weekId ? isInWeek(pubDate, weekId) : isCurrentWeek(pubDate);
+      if (!matchesWeek) continue;
 
       if (isPaywalled(item, feed.paywallPhrases ?? [])) continue;
 
