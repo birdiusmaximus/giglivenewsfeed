@@ -4,7 +4,9 @@ import Link from 'next/link';
 import Logo from '@/components/Logo';
 import ThemeToggle from '@/components/ThemeToggle';
 
-export const revalidate = 3600;
+// Always read fresh from KV — the archive index only changes on cron/backfill,
+// but those changes must appear immediately, not after a 1-hour cache window.
+export const revalidate = 0;
 
 export default async function ArchivePage() {
   const index = await getArchiveIndex();
