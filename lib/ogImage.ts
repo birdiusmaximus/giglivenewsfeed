@@ -229,6 +229,28 @@ export async function fetchOgImage(url: string, timeoutMs = 8000): Promise<strin
 }
 
 /**
+ * Try to upgrade a WordPress-style thumbnail URL to its full-size original.
+ * WordPress generates variants like `image-140x91.png` from an original
+ * `image.png` — stripping the size suffix usually gets the full version.
+ * Returns null if the URL doesn't match the pattern.
+ */
+function upgradeImageQuality(url: string): string | null {
+  const upgraded = url.replace(/-\d+x\d+(\.[a-zA-Z]+)(\?.*)?$/i, '$1$2');
+  return upgraded !== url ? upgraded : null;
+}
+
+/**
+ * Pick the first image URL in `candidates` that resolves to a real image.
+ * Used to prefer a high-quality variant but gracefully fall back if it 404s.
+ */
+async function pickReachableImage(candidates: string[]): Promise<string | undefined> {
+  for (const url of candidates) {
+    if (await isImageReachable(url)) return url;
+  }
+  return undefined;
+}
+
+/**
  * Verify an image URL is actually reachable and returns an image.
  * Uses a HEAD request to avoid downloading the full image.
  * Returns false if the URL is unreachable, returns a non-2xx status,
@@ -312,11 +334,17 @@ export async function enrichWithOgImages<
         }
       }
 
-      // Verify the image is actually reachable — broken URLs (403, 404, redirects
-      // to HTML pages, etc.) are nullified so the article gets dropped downstream.
+      // Try to upgrade WordPress thumbnails (e.g. image-140x91.png → image.png)
+      // then verify reachability. If the upgraded URL works, use it; otherwise
+      // fall back to the original; if neither responds, drop the image.
       if (updatedItem.imageUrl) {
-        const ok = await isImageReachable(updatedItem.imageUrl);
-        if (!ok) updatedItem = { ...updatedItem, imageUrl: undefined };
+        const candidates = [
+          upgradeImageQuality(updatedItem.imageUrl),
+          updatedItem.imageUrl,
+        ].filter((x): x is string => !!x);
+
+        const winner = await pickReachableImage(candidates);
+        updatedItem = { ...updatedItem, imageUrl: winner };
       }
 
       out[index] = updatedItem;
