@@ -90,7 +90,7 @@ function cleanDescription(raw: string | undefined): string {
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]*\n[ \t]*/g, '\n')
     .trim()
-    .slice(0, 2000);
+    .slice(0, 8000);
 }
 
 /**

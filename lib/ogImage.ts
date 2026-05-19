@@ -1,7 +1,66 @@
 import * as cheerio from 'cheerio';
+import { JSDOM } from 'jsdom';
+import { Readability } from '@mozilla/readability';
 // @ts-expect-error - no types shipped with this package
 import googleNewsUrlDecoder from 'google-news-url-decoder';
 import { decodeHtmlEntities } from './textUtils';
+
+/**
+ * Maximum article description length. ~1,500 words of reading.
+ */
+const MAX_DESCRIPTION_LENGTH = 8000;
+
+/**
+ * Use Mozilla Readability (the same engine behind Firefox's Reader View) to
+ * extract the article body from full HTML. Falls back to undefined if the
+ * page isn't article-shaped or Readability fails.
+ *
+ * Returns paragraphs joined with `\n\n` so they render cleanly in the
+ * preview pane via the existing whitespace-pre-line + paragraph splitting.
+ */
+function extractWithReadability(html: string, url: string): string | undefined {
+  try {
+    const dom = new JSDOM(html, { url });
+    const reader = new Readability(dom.window.document, {
+      // Accept shorter articles too — default 500 is too aggressive for some sources
+      charThreshold: 100,
+    });
+    const article = reader.parse();
+    if (!article?.content) return undefined;
+
+    // Walk the cleaned article HTML and pull paragraphs + list items.
+    // We use cheerio rather than jsdom here because we already have it loaded
+    // and the article HTML at this point is well-formed.
+    const $$ = cheerio.load(article.content);
+    const paragraphs: string[] = [];
+    $$('p, li, blockquote, h2, h3, h4').each((_, el) => {
+      const tag = (el as { name?: string }).name;
+      const raw = $$(el).text();
+      const text = decodeHtmlEntities(raw).replace(/\s+/g, ' ').trim();
+      if (text.length < 30) return;
+      // Headings get prepended with a visual marker via Markdown-ish '## '
+      // (rendered as plain text since description is plain text)
+      if (tag === 'h2' || tag === 'h3' || tag === 'h4') {
+        paragraphs.push(text);
+      } else {
+        paragraphs.push(text);
+      }
+    });
+
+    if (paragraphs.length === 0) return undefined;
+
+    // Join with double-newline up to the length cap
+    let excerpt = '';
+    for (const p of paragraphs) {
+      const sep = excerpt ? '\n\n' : '';
+      if (excerpt.length + sep.length + p.length > MAX_DESCRIPTION_LENGTH) break;
+      excerpt += sep + p;
+    }
+    return excerpt.length >= 200 ? excerpt : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const { GoogleDecoder } = googleNewsUrlDecoder as { GoogleDecoder: new () => GoogleDecoderInstance };
 type GoogleDecoderInstance = {
@@ -147,14 +206,25 @@ export async function fetchOgMeta(url: string, timeoutMs = 8000): Promise<OgMeta
     ];
     for (const re of descRegexes) {
       const m = html.match(re);
-      if (m?.[1]) { description = decodeHtmlEntities(m[1].trim()).slice(0, 2000); break; }
+      if (m?.[1]) { description = decodeHtmlEntities(m[1].trim()).slice(0, MAX_DESCRIPTION_LENGTH); break; }
     }
 
     // --- Video (iframes, og:video, twitter:player) ---
     const video = extractVideo(html);
 
-    // Cheerio for anything the regex missed + article body extraction
-    // Always run if description is short (< 200 chars) so we get richer excerpts
+    // --- Article body via Mozilla Readability (primary) ---
+    // Run whenever we'd otherwise have a short description. Readability
+    // handles ~95% of publishers cleanly and gives us full-text paragraphs.
+    if (!description || description.length < 600) {
+      const readable = extractWithReadability(html, url);
+      if (readable && readable.length > (description?.length ?? 0)) {
+        description = readable;
+      }
+    }
+
+    // --- Cheerio for anything the regex/Readability missed ---
+    // Used for image fallbacks and as a secondary description path when
+    // Readability didn't return anything.
     if (!imageUrl || !description || description.length < 200) {
       const $ = cheerio.load(html);
 
@@ -183,35 +253,38 @@ export async function fetchOgMeta(url: string, timeoutMs = 8000): Promise<OgMeta
           $('meta[name="description"]').attr('content');
         const metaDesc = rawMetaDesc ? decodeHtmlEntities(rawMetaDesc) : undefined;
 
-        // Extract body paragraphs for a richer multi-paragraph excerpt.
-        // cheerio's .text() decodes one level of entities, but some publishers
-        // serve double-encoded HTML — decode again to be safe.
+        // Selector-based body extraction (last-resort fallback when
+        // Readability gave up — handles pages it doesn't recognise as
+        // article-shaped).
         const bodyParas: string[] = [];
-        const bodySelectors = ['article p', 'main p', '.post-content p', '.article-body p', '.entry-content p', '.story p'];
+        const bodySelectors = [
+          'article p', 'main p',
+          '.post-content p', '.article-body p', '.entry-content p',
+          '.story p', '.c-article__body p', '[data-component="body"] p',
+          '.text-block p', '.story-body p', '.article__body p',
+        ];
         for (const sel of bodySelectors) {
           $(sel).each((_, el) => {
             const text = decodeHtmlEntities($(el).text()).replace(/\s+/g, ' ').trim();
             if (text.length > 60) bodyParas.push(text);
           });
-          if (bodyParas.length >= 6) break;
+          if (bodyParas.length >= 12) break;
         }
 
         if (bodyParas.length > 0) {
-          // Join with double-newline to preserve paragraph structure
           let excerpt = '';
           for (const p of bodyParas) {
             const sep = excerpt ? '\n\n' : '';
-            if (excerpt.length + sep.length + p.length > 2000) break;
+            if (excerpt.length + sep.length + p.length > MAX_DESCRIPTION_LENGTH) break;
             excerpt += sep + p;
           }
-          // Prefer body excerpt when it's substantially richer than meta desc
-          if (excerpt.length > (metaDesc?.length ?? 0)) {
-            description = excerpt.slice(0, 2000);
-          } else if (metaDesc && metaDesc.length >= 20) {
-            description = metaDesc.trim().slice(0, 2000);
+          if (excerpt.length > (description?.length ?? 0)) {
+            description = excerpt.slice(0, MAX_DESCRIPTION_LENGTH);
+          } else if (metaDesc && metaDesc.length >= 20 && !description) {
+            description = metaDesc.trim().slice(0, MAX_DESCRIPTION_LENGTH);
           }
-        } else if (metaDesc && metaDesc.length >= 20) {
-          description = metaDesc.trim().slice(0, 2000);
+        } else if (metaDesc && metaDesc.length >= 20 && !description) {
+          description = metaDesc.trim().slice(0, MAX_DESCRIPTION_LENGTH);
         }
       }
     }
@@ -326,13 +399,16 @@ export async function enrichWithOgImages<
       const needsImage = !updatedItem.imageUrl;
       const needsDesc = !updatedItem.description ||
         isWeakDescription(updatedItem.description, updatedItem.title ?? '') ||
-        updatedItem.description.length < 200;
+        updatedItem.description.length < 1500;
       const needsVideo = !updatedItem.videoUrl;
 
       if (needsImage || needsDesc || needsVideo) {
         const meta = await fetchOgMeta(resolvedUrl);
         if (needsImage && meta.imageUrl) updatedItem = { ...updatedItem, imageUrl: meta.imageUrl };
-        if (needsDesc && meta.description) updatedItem = { ...updatedItem, description: meta.description };
+        // Prefer the longer/richer description from either source
+        if (meta.description && meta.description.length > (updatedItem.description?.length ?? 0)) {
+          updatedItem = { ...updatedItem, description: meta.description };
+        }
         if (needsVideo && meta.videoUrl) {
           updatedItem = { ...updatedItem, videoUrl: meta.videoUrl, videoType: meta.videoType };
         }
