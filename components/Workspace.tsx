@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Article, Category, KeywordFilter } from '@/lib/types';
 import { KEYWORD_FILTERS } from '@/lib/types';
 import { loadSourcePrefs, saveSourcePrefs, type SourcePrefs } from '@/lib/sourceStorage';
+import {
+  loadKeywordPrefs,
+  saveKeywordPrefs,
+  matchesKeyword,
+  type KeywordFilterPrefs,
+} from '@/lib/keywordStorage';
 import Sidebar from './Sidebar';
 import ArticleList from './ArticleList';
 import ArticlePreview from './ArticlePreview';
@@ -24,7 +30,10 @@ export default function Workspace({
 }: Props) {
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [activeKeywordId, setActiveKeywordId] = useState<string | null>(null);
-  const [customFilters, setCustomFilters] = useState<KeywordFilter[]>([]);
+  const [keywordPrefs, setKeywordPrefs] = useState<KeywordFilterPrefs>({
+    customFilters: [],
+    dismissedDefaultIds: [],
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Source preferences (built-in toggles + custom feeds)
@@ -36,7 +45,13 @@ export default function Workspace({
   // Hydrate prefs from localStorage on mount
   useEffect(() => {
     setSourcePrefs(loadSourcePrefs());
+    setKeywordPrefs(loadKeywordPrefs());
   }, []);
+
+  const updateKeywordPrefs = (next: KeywordFilterPrefs) => {
+    setKeywordPrefs(next);
+    saveKeywordPrefs(next);
+  };
 
   // Persist prefs whenever they change (skip the initial empty default)
   const handlePrefsChange = (next: SourcePrefs) => {
@@ -89,18 +104,21 @@ export default function Workspace({
     return deduped;
   }, [articles, customArticles, sourcePrefs.disabledIds]);
 
-  const allKeywordFilters = useMemo(
-    () => [...KEYWORD_FILTERS, ...customFilters],
-    [customFilters]
-  );
+  const allKeywordFilters = useMemo(() => {
+    // Predefined filters minus any the user has dismissed, plus their custom ones
+    const activeDefaults = KEYWORD_FILTERS.filter(
+      (f) => !keywordPrefs.dismissedDefaultIds.includes(f.id)
+    );
+    return [...activeDefaults, ...keywordPrefs.customFilters];
+  }, [keywordPrefs]);
 
   const filtered = useMemo(() => {
     if (activeKeywordId) {
       const kf = allKeywordFilters.find((f) => f.id === activeKeywordId);
       if (kf) {
         return mergedArticles.filter((a) => {
-          const text = `${a.title} ${a.description}`.toLowerCase();
-          return kf.keywords.some((kw) => text.includes(kw.toLowerCase()));
+          const text = `${a.title} ${a.description}`;
+          return kf.keywords.some((kw) => matchesKeyword(text, kw));
         });
       }
     }
@@ -129,8 +147,8 @@ export default function Workspace({
     const map: Record<string, number> = {};
     for (const kf of allKeywordFilters) {
       map[kf.id] = mergedArticles.filter((a) => {
-        const text = `${a.title} ${a.description}`.toLowerCase();
-        return kf.keywords.some((kw) => text.includes(kw.toLowerCase()));
+        const text = `${a.title} ${a.description}`;
+        return kf.keywords.some((kw) => matchesKeyword(text, kw));
       }).length;
     }
     return map;
@@ -150,16 +168,41 @@ export default function Workspace({
 
   const handleAddCustomFilter = (label: string, keyword: string) => {
     const id = `custom-${Date.now()}`;
-    setCustomFilters((prev) => [
-      ...prev,
-      { id, label, keywords: [keyword], custom: true },
-    ]);
-    handleKeywordFilterChange(id);
+    const newFilter: KeywordFilter = { id, label, keywords: [keyword], custom: true };
+    updateKeywordPrefs({
+      ...keywordPrefs,
+      customFilters: [...keywordPrefs.customFilters, newFilter],
+    });
+    setActiveKeywordId(id);
+    setActiveCategory('all');
+    setSelectedId(null);
   };
 
+  /**
+   * Remove a keyword filter. For predefined filters this records a dismissal
+   * (so they don't reappear next reload). For custom filters it deletes them.
+   */
   const handleRemoveCustomFilter = (id: string) => {
-    setCustomFilters((prev) => prev.filter((f) => f.id !== id));
+    const isDefault = KEYWORD_FILTERS.some((f) => f.id === id);
+    if (isDefault) {
+      updateKeywordPrefs({
+        ...keywordPrefs,
+        dismissedDefaultIds: [...keywordPrefs.dismissedDefaultIds, id],
+      });
+    } else {
+      updateKeywordPrefs({
+        ...keywordPrefs,
+        customFilters: keywordPrefs.customFilters.filter((f) => f.id !== id),
+      });
+    }
     if (activeKeywordId === id) setActiveKeywordId(null);
+  };
+
+  const hasDismissedDefaults = keywordPrefs.dismissedDefaultIds.length > 0;
+
+  /** Reset all dismissed defaults so the predefined filters reappear */
+  const handleRestoreDefaults = () => {
+    updateKeywordPrefs({ ...keywordPrefs, dismissedDefaultIds: [] });
   };
 
   return (
@@ -179,6 +222,8 @@ export default function Workspace({
           onKeywordFilterChange={handleKeywordFilterChange}
           onAddCustomFilter={handleAddCustomFilter}
           onRemoveCustomFilter={handleRemoveCustomFilter}
+          hasDismissedDefaults={hasDismissedDefaults}
+          onRestoreDefaults={handleRestoreDefaults}
         />
         <ArticleList
           articles={filtered}

@@ -20,7 +20,10 @@ interface Props {
   keywordCounts: Record<string, number>;
   onKeywordFilterChange: (id: string | null) => void;
   onAddCustomFilter: (label: string, keyword: string) => void;
+  /** Remove any keyword filter (predefined gets dismissed; custom gets deleted) */
   onRemoveCustomFilter: (id: string) => void;
+  hasDismissedDefaults?: boolean;
+  onRestoreDefaults?: () => void;
 }
 
 export default function Sidebar({
@@ -37,6 +40,8 @@ export default function Sidebar({
   onKeywordFilterChange,
   onAddCustomFilter,
   onRemoveCustomFilter,
+  hasDismissedDefaults = false,
+  onRestoreDefaults,
 }: Props) {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -160,16 +165,17 @@ export default function Sidebar({
                     </span>
                   )}
                 </button>
-                {/* Remove button for custom filters */}
-                {kf.custom && (
-                  <button
-                    onClick={() => onRemoveCustomFilter(kf.id)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center text-night/30 dark:text-paper/30 hover:text-flame opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove filter"
-                  >
-                    ×
-                  </button>
-                )}
+                {/* Remove button — predefined gets dismissed, custom gets deleted */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveCustomFilter(kf.id);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center text-night/30 dark:text-paper/30 hover:text-paper hover:bg-flame opacity-0 group-hover:opacity-100 transition-all bg-white dark:bg-dusk"
+                  title={kf.custom ? 'Remove filter' : 'Hide this filter'}
+                >
+                  ×
+                </button>
               </div>
             );
           })}
@@ -193,6 +199,16 @@ export default function Sidebar({
               +
             </button>
           </div>
+
+          {/* Restore dismissed defaults (only shown when there are any) */}
+          {hasDismissedDefaults && onRestoreDefaults && (
+            <button
+              onClick={onRestoreDefaults}
+              className="mt-2 text-night/40 dark:text-paper/40 hover:text-flame text-[10px] uppercase tracking-brand font-bold transition-colors"
+            >
+              ↺ Restore default filters
+            </button>
+          )}
         </div>
       </div>
 
