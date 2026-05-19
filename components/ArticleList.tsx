@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import type { Article } from '@/lib/types';
@@ -37,8 +37,8 @@ export default function ArticleList({
         article,
         date,
         showDay,
-        dayName: format(date, 'EEE'),
-        dayNum: format(date, 'd'),
+        // Friendly section header: "Tuesday · May 19"
+        dayLabel: format(date, 'EEEE · MMMM d'),
       };
     });
   }, [articles]);
@@ -86,124 +86,130 @@ export default function ArticleList({
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-night/6 dark:divide-paper/8">
-            {rows.map(({ article, showDay, dayName, dayNum }) => {
+          <ul>
+            {rows.map(({ article, showDay, dayLabel }, idx) => {
               const isSelected = article.id === selectedId;
+              const isFirstOverall = idx === 0;
               return (
-                <li key={article.id} className="relative">
-                  <button
-                    onClick={() => onSelect(article.id)}
+                <Fragment key={article.id}>
+                  {/* Day section header — replaces the per-row day marker.
+                      Renders before the first article of each day; thin line
+                      runs to the right edge to create a clean visual break. */}
+                  {showDay && (
+                    <li
+                      aria-hidden
+                      className={clsx(
+                        'px-5 pb-2 flex items-center gap-3',
+                        isFirstOverall ? 'pt-4' : 'pt-7'
+                      )}
+                    >
+                      <span className="text-[10px] uppercase tracking-brand font-black text-night/40 dark:text-paper/40 flex-shrink-0">
+                        {dayLabel}
+                      </span>
+                      <span className="flex-1 h-px bg-night/10 dark:bg-paper/10" />
+                    </li>
+                  )}
+
+                  <li
                     className={clsx(
-                      'w-full text-left px-5 py-4 flex gap-3 items-start transition-colors group',
-                      isSelected
-                        ? 'bg-paper dark:bg-night'
-                        : 'hover:bg-paper/50 dark:hover:bg-night/40'
+                      'relative',
+                      // Border between articles WITHIN the same day.
+                      // No border immediately under a day header (the header
+                      // itself is the visual separator).
+                      !showDay && 'border-t border-night/6 dark:border-paper/8'
                     )}
                   >
-                    {isSelected && (
-                      <span className="absolute left-0 top-3 bottom-3 w-0.5 bg-flame rounded-r" />
-                    )}
-
-                    {/* Day marker */}
-                    <div className="w-10 flex-shrink-0 pt-0.5">
-                      {showDay ? (
-                        <>
-                          <div className="text-night/40 dark:text-paper/40 text-[9px] uppercase tracking-brand font-black">
-                            {dayName}
-                          </div>
-                          <div
-                            className={clsx(
-                              'text-2xl font-black leading-none mt-1 transition-colors',
-                              isSelected ? 'text-flame' : 'text-night dark:text-paper'
-                            )}
-                          >
-                            {dayNum}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-night/15 dark:text-paper/15 text-[9px] uppercase tracking-brand font-bold">
-                          ·
-                        </div>
+                    <button
+                      onClick={() => onSelect(article.id)}
+                      className={clsx(
+                        'w-full text-left px-5 py-4 flex gap-3 items-start transition-colors group',
+                        isSelected
+                          ? 'bg-paper dark:bg-night'
+                          : 'hover:bg-paper/50 dark:hover:bg-night/40'
                       )}
-                    </div>
-
-                    {/* Thumbnail */}
-                    <div
-                      className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden bg-night/5 dark:bg-paper/5"
-                      style={{
-                        boxShadow: `inset 0 2px 0 ${article.sourceColor}`,
-                      }}
                     >
-                      {article.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={article.imageUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div
-                          className="w-full h-full flex items-center justify-center"
-                          style={{ backgroundColor: article.sourceColor + '18' }}
-                        >
-                          <span
-                            className="text-[10px] font-black uppercase tracking-wider"
-                            style={{ color: article.sourceColor }}
-                          >
-                            {article.sourceName.slice(0, 2)}
-                          </span>
-                        </div>
+                      {isSelected && (
+                        <span className="absolute left-0 top-3 bottom-3 w-0.5 bg-flame rounded-r" />
                       )}
-                    </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 pr-8">
-                      <p className="text-[10px] uppercase tracking-wider font-black mb-1 truncate text-night/35 dark:text-paper/35">
-                        {timeAgo(article.publishedAt)}
-                      </p>
-                      <h3
-                        className={clsx(
-                          'font-bold text-sm leading-snug line-clamp-2 transition-colors',
-                          isSelected
-                            ? 'text-night dark:text-paper'
-                            : 'text-night/85 dark:text-paper/85 group-hover:text-night dark:group-hover:text-paper'
-                        )}
-                      >
-                        {article.title}
-                      </h3>
-                      <p
-                        className="text-xs mt-1.5 font-bold uppercase tracking-wider truncate"
-                        style={{ color: article.sourceColor }}
-                      >
-                        by {article.sourceName}
-                      </p>
-                    </div>
-
-                    {/* Arrow indicator pointing to preview */}
-                    {isSelected && (
+                      {/* Thumbnail */}
                       <div
-                        aria-hidden
-                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[7px] w-3 h-3 bg-paper dark:bg-night rotate-45 border-r border-t border-night/8 dark:border-paper/10 hidden lg:block"
-                      />
-                    )}
-                  </button>
+                        className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden bg-night/5 dark:bg-paper/5"
+                        style={{
+                          boxShadow: `inset 0 2px 0 ${article.sourceColor}`,
+                        }}
+                      >
+                        {article.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={article.imageUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className="w-full h-full flex items-center justify-center"
+                            style={{ backgroundColor: article.sourceColor + '18' }}
+                          >
+                            <span
+                              className="text-[10px] font-black uppercase tracking-wider"
+                              style={{ color: article.sourceColor }}
+                            >
+                              {article.sourceName.slice(0, 2)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                  {/* Bookmark — outside the row button to avoid invalid nested buttons */}
-                  {bookmarkIds && onToggleBookmark && (
-                    <div className="absolute right-3 top-3 z-10">
-                      <BookmarkButton
-                        size="sm"
-                        saved={bookmarkIds.has(article.id)}
-                        onToggle={() => onToggleBookmark(article)}
-                      />
-                    </div>
-                  )}
-                </li>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 pr-8">
+                        <p className="text-[10px] uppercase tracking-wider font-black mb-1 truncate text-night/35 dark:text-paper/35">
+                          {timeAgo(article.publishedAt)}
+                        </p>
+                        <h3
+                          className={clsx(
+                            'font-bold text-sm leading-snug line-clamp-2 transition-colors',
+                            isSelected
+                              ? 'text-night dark:text-paper'
+                              : 'text-night/85 dark:text-paper/85 group-hover:text-night dark:group-hover:text-paper'
+                          )}
+                        >
+                          {article.title}
+                        </h3>
+                        <p
+                          className="text-xs mt-1.5 font-bold uppercase tracking-wider truncate"
+                          style={{ color: article.sourceColor }}
+                        >
+                          by {article.sourceName}
+                        </p>
+                      </div>
+
+                      {/* Arrow indicator pointing to preview */}
+                      {isSelected && (
+                        <div
+                          aria-hidden
+                          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[7px] w-3 h-3 bg-paper dark:bg-night rotate-45 border-r border-t border-night/8 dark:border-paper/10 hidden lg:block"
+                        />
+                      )}
+                    </button>
+
+                    {/* Bookmark — outside the row button to avoid invalid nested buttons */}
+                    {bookmarkIds && onToggleBookmark && (
+                      <div className="absolute right-3 top-3 z-10">
+                        <BookmarkButton
+                          size="sm"
+                          saved={bookmarkIds.has(article.id)}
+                          onToggle={() => onToggleBookmark(article)}
+                        />
+                      </div>
+                    )}
+                  </li>
+                </Fragment>
               );
             })}
           </ul>
