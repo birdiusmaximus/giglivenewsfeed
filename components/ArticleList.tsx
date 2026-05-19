@@ -37,8 +37,8 @@ export default function ArticleList({
         article,
         date,
         showDay,
-        // Friendly section header: "Tuesday · May 19"
-        dayLabel: format(date, 'EEEE · MMMM d'),
+        dayName: format(date, 'EEE'), // "Tue"
+        dayNum: format(date, 'd'),    // "19"
       };
     });
   }, [articles]);
@@ -87,26 +87,29 @@ export default function ArticleList({
           </div>
         ) : (
           <ul>
-            {rows.map(({ article, showDay, dayLabel }, idx) => {
+            {rows.map(({ article, showDay, dayName, dayNum }, idx) => {
               const isSelected = article.id === selectedId;
               const isFirstOverall = idx === 0;
               return (
                 <Fragment key={article.id}>
-                  {/* Day section header — replaces the per-row day marker.
-                      Renders before the first article of each day; thin line
-                      runs to the right edge to create a clean visual break. */}
+                  {/* Day section header — mirrors the sidebar's "WEEK 21"
+                      typographic style: small uppercase label + bold number,
+                      with a thin line running to the right edge. */}
                   {showDay && (
                     <li
                       aria-hidden
                       className={clsx(
-                        'px-5 pb-2 flex items-center gap-3',
+                        'px-5 pb-2 flex items-end gap-2.5',
                         isFirstOverall ? 'pt-4' : 'pt-7'
                       )}
                     >
-                      <span className="text-sm font-black tracking-tight text-night/70 dark:text-paper/70 flex-shrink-0">
-                        {dayLabel}
+                      <span className="text-night/40 dark:text-paper/40 text-xs uppercase tracking-brand font-bold pb-1 flex-shrink-0">
+                        {dayName}
                       </span>
-                      <span className="flex-1 h-px bg-night/10 dark:bg-paper/10" />
+                      <span className="text-night dark:text-paper text-2xl font-black leading-none flex-shrink-0">
+                        {dayNum}
+                      </span>
+                      <span className="flex-1 h-px bg-night/10 dark:bg-paper/10 mb-2 ml-2" />
                     </li>
                   )}
 
