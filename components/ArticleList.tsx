@@ -78,7 +78,7 @@ export default function ArticleList({
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {articles.length === 0 ? (
           <div className="p-10 text-center">
             <p className="text-night/30 dark:text-paper/30 text-xs leading-relaxed font-bold max-w-[280px] mx-auto">
