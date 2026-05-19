@@ -125,7 +125,7 @@ export default function ArticleList({
                     <button
                       onClick={() => onSelect(article.id)}
                       className={clsx(
-                        'w-full text-left px-5 py-4 flex gap-3.5 items-stretch transition-colors group',
+                        'w-full text-left px-5 py-4 flex gap-3.5 items-start transition-colors group',
                         isSelected
                           ? 'bg-paper dark:bg-night'
                           : 'hover:bg-paper/50 dark:hover:bg-night/40'
@@ -135,11 +135,10 @@ export default function ArticleList({
                         <span className="absolute left-0 top-3 bottom-3 w-0.5 bg-flame rounded-r" />
                       )}
 
-                      {/* Thumbnail — stretches to match content height (top of
-                          time meta to bottom of source label) for a balanced
-                          card feel rather than a tiny square. */}
+                      {/* Thumbnail — fixed square, sized close to the height
+                          of the 3-line text column for visual balance. */}
                       <div
-                        className="w-20 flex-shrink-0 rounded-md overflow-hidden bg-night/5 dark:bg-paper/5"
+                        className="w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-night/5 dark:bg-paper/5"
                         style={{
                           boxShadow: `inset 0 2px 0 ${article.sourceColor}`,
                         }}
