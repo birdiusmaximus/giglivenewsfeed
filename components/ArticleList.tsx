@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import clsx from 'clsx';
 import type { Article } from '@/lib/types';
 import { timeAgo } from '@/lib/weekUtils';
+import BookmarkButton from './BookmarkButton';
 
 interface Props {
   articles: Article[];
@@ -10,9 +11,21 @@ interface Props {
   onSelect: (id: string) => void;
   onOpenSourceSelector?: () => void;
   customLoading?: boolean;
+  bookmarkIds?: Set<string>;
+  onToggleBookmark?: (article: Article) => void;
+  emptyMessage?: string;
 }
 
-export default function ArticleList({ articles, selectedId, onSelect, onOpenSourceSelector, customLoading }: Props) {
+export default function ArticleList({
+  articles,
+  selectedId,
+  onSelect,
+  onOpenSourceSelector,
+  customLoading,
+  bookmarkIds,
+  onToggleBookmark,
+  emptyMessage,
+}: Props) {
   const rows = useMemo(() => {
     let prevDay = '';
     return articles.map((article) => {
@@ -68,8 +81,8 @@ export default function ArticleList({ articles, selectedId, onSelect, onOpenSour
       <div className="flex-1 overflow-y-auto">
         {articles.length === 0 ? (
           <div className="p-10 text-center">
-            <p className="text-night/30 dark:text-paper/30 text-xs uppercase tracking-brand font-bold">
-              No articles in this category
+            <p className="text-night/30 dark:text-paper/30 text-xs leading-relaxed font-bold max-w-[280px] mx-auto">
+              {emptyMessage ?? 'No articles in this category'}
             </p>
           </div>
         ) : (
@@ -149,11 +162,9 @@ export default function ArticleList({ articles, selectedId, onSelect, onOpenSour
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] uppercase tracking-wider font-black mb-1 truncate">
-                        <span className="text-night/35 dark:text-paper/35">
-                          {timeAgo(article.publishedAt)}
-                        </span>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <p className="text-[10px] uppercase tracking-wider font-black mb-1 truncate text-night/35 dark:text-paper/35">
+                        {timeAgo(article.publishedAt)}
                       </p>
                       <h3
                         className={clsx(
@@ -181,6 +192,17 @@ export default function ArticleList({ articles, selectedId, onSelect, onOpenSour
                       />
                     )}
                   </button>
+
+                  {/* Bookmark — outside the row button to avoid invalid nested buttons */}
+                  {bookmarkIds && onToggleBookmark && (
+                    <div className="absolute right-3 top-3 z-10">
+                      <BookmarkButton
+                        size="sm"
+                        saved={bookmarkIds.has(article.id)}
+                        onToggle={() => onToggleBookmark(article)}
+                      />
+                    </div>
+                  )}
                 </li>
               );
             })}

@@ -10,10 +10,19 @@ import {
   matchesKeyword,
   type KeywordFilterPrefs,
 } from '@/lib/keywordStorage';
+import {
+  loadBookmarks,
+  saveBookmarks,
+  loadSubscriberEmail,
+  saveSubscriberEmail,
+  syncBookmarksToServer,
+  type BookmarkedArticle,
+} from '@/lib/bookmarkStorage';
 import Sidebar from './Sidebar';
 import ArticleList from './ArticleList';
 import ArticlePreview from './ArticlePreview';
 import SourceSelector from './SourceSelector';
+import SubscribeModal from './SubscribeModal';
 
 interface Props {
   articles: Article[];
@@ -42,11 +51,32 @@ export default function Workspace({
   const [customArticles, setCustomArticles] = useState<Article[]>([]);
   const [customLoading, setCustomLoading] = useState(false);
 
+  // Bookmarks + email digest subscription
+  const [bookmarks, setBookmarks] = useState<BookmarkedArticle[]>([]);
+  const [subscriberEmail, setSubscriberEmail] = useState<string | null>(null);
+  const [subscribeModalOpen, setSubscribeModalOpen] = useState(false);
+  const [savesViewActive, setSavesViewActive] = useState(false);
+
   // Hydrate prefs from localStorage on mount
   useEffect(() => {
     setSourcePrefs(loadSourcePrefs());
     setKeywordPrefs(loadKeywordPrefs());
+    setBookmarks(loadBookmarks());
+    setSubscriberEmail(loadSubscriberEmail());
   }, []);
+
+  const toggleBookmark = (article: Article) => {
+    const exists = bookmarks.some((b) => b.id === article.id);
+    const next = exists
+      ? bookmarks.filter((b) => b.id !== article.id)
+      : [{ ...article, bookmarkedAt: new Date().toISOString() }, ...bookmarks];
+    setBookmarks(next);
+    saveBookmarks(next);
+    // Best-effort sync to digest server if user has subscribed
+    void syncBookmarksToServer(subscriberEmail, next);
+  };
+
+  const bookmarkIds = useMemo(() => new Set(bookmarks.map((b) => b.id)), [bookmarks]);
 
   const updateKeywordPrefs = (next: KeywordFilterPrefs) => {
     setKeywordPrefs(next);
@@ -113,6 +143,9 @@ export default function Workspace({
   }, [keywordPrefs]);
 
   const filtered = useMemo(() => {
+    // Saves view trumps all other filters
+    if (savesViewActive) return bookmarks;
+
     if (activeKeywordId) {
       const kf = allKeywordFilters.find((f) => f.id === activeKeywordId);
       if (kf) {
@@ -125,7 +158,7 @@ export default function Workspace({
     return activeCategory === 'all'
       ? mergedArticles
       : mergedArticles.filter((a) => a.category === activeCategory);
-  }, [mergedArticles, activeCategory, activeKeywordId, allKeywordFilters]);
+  }, [mergedArticles, activeCategory, activeKeywordId, allKeywordFilters, savesViewActive, bookmarks]);
 
   const selectedArticle = useMemo(() => {
     if (selectedId) {
@@ -157,13 +190,35 @@ export default function Workspace({
   const handleCategoryChange = (c: Category) => {
     setActiveCategory(c);
     setActiveKeywordId(null);
+    setSavesViewActive(false);
     setSelectedId(null);
   };
 
   const handleKeywordFilterChange = (id: string | null) => {
     setActiveKeywordId(id);
     setActiveCategory('all');
+    setSavesViewActive(false);
     setSelectedId(null);
+  };
+
+  const handleSavesViewToggle = () => {
+    const next = !savesViewActive;
+    setSavesViewActive(next);
+    if (next) {
+      setActiveCategory('all');
+      setActiveKeywordId(null);
+    }
+    setSelectedId(null);
+  };
+
+  const handleSubscribed = (email: string) => {
+    setSubscriberEmail(email);
+    saveSubscriberEmail(email);
+  };
+
+  const handleUnsubscribed = () => {
+    setSubscriberEmail(null);
+    saveSubscriberEmail(null);
   };
 
   const handleAddCustomFilter = (label: string, keyword: string) => {
@@ -224,6 +279,11 @@ export default function Workspace({
           onRemoveCustomFilter={handleRemoveCustomFilter}
           hasDismissedDefaults={hasDismissedDefaults}
           onRestoreDefaults={handleRestoreDefaults}
+          savesCount={bookmarks.length}
+          savesViewActive={savesViewActive}
+          onToggleSavesView={handleSavesViewToggle}
+          subscriberEmail={subscriberEmail}
+          onOpenSubscribe={() => setSubscribeModalOpen(true)}
         />
         <ArticleList
           articles={filtered}
@@ -231,8 +291,15 @@ export default function Workspace({
           onSelect={setSelectedId}
           onOpenSourceSelector={() => setSourceSelectorOpen(true)}
           customLoading={customLoading}
+          bookmarkIds={bookmarkIds}
+          onToggleBookmark={toggleBookmark}
+          emptyMessage={savesViewActive ? 'No saved articles yet — click the bookmark icon on any article to save it.' : undefined}
         />
-        <ArticlePreview article={selectedArticle} />
+        <ArticlePreview
+          article={selectedArticle}
+          isBookmarked={selectedArticle ? bookmarkIds.has(selectedArticle.id) : false}
+          onToggleBookmark={selectedArticle ? () => toggleBookmark(selectedArticle) : undefined}
+        />
       </div>
 
       <SourceSelector
@@ -240,6 +307,14 @@ export default function Workspace({
         onClose={() => setSourceSelectorOpen(false)}
         prefs={sourcePrefs}
         onChange={handlePrefsChange}
+      />
+      <SubscribeModal
+        open={subscribeModalOpen}
+        onClose={() => setSubscribeModalOpen(false)}
+        currentEmail={subscriberEmail}
+        bookmarks={bookmarks}
+        onSubscribed={handleSubscribed}
+        onUnsubscribed={handleUnsubscribed}
       />
     </div>
   );

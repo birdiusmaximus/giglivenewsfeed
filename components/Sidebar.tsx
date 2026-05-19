@@ -24,6 +24,11 @@ interface Props {
   onRemoveCustomFilter: (id: string) => void;
   hasDismissedDefaults?: boolean;
   onRestoreDefaults?: () => void;
+  savesCount?: number;
+  savesViewActive?: boolean;
+  onToggleSavesView?: () => void;
+  subscriberEmail?: string | null;
+  onOpenSubscribe?: () => void;
 }
 
 export default function Sidebar({
@@ -42,6 +47,11 @@ export default function Sidebar({
   onRemoveCustomFilter,
   hasDismissedDefaults = false,
   onRestoreDefaults,
+  savesCount = 0,
+  savesViewActive = false,
+  onToggleSavesView,
+  subscriberEmail,
+  onOpenSubscribe,
 }: Props) {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -84,6 +94,33 @@ export default function Sidebar({
 
       {/* Scrollable filter area */}
       <div className="flex-1 overflow-y-auto">
+        {/* My Saves button — special filter that shows bookmarked articles */}
+        {onToggleSavesView && (
+          <div className="px-3 pt-4 pb-1">
+            <button
+              onClick={onToggleSavesView}
+              className={clsx(
+                'w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-brand transition-all text-left relative',
+                savesViewActive
+                  ? 'bg-flame text-paper'
+                  : 'border border-night/10 dark:border-paper/10 text-night/70 dark:text-paper/70 hover:border-flame hover:text-flame'
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill={savesViewActive ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+                  <path d="M4 2.5h8a.5.5 0 0 1 .5.5v11l-4.5-3-4.5 3v-11a.5.5 0 0 1 .5-.5z" />
+                </svg>
+                My Saves
+              </span>
+              {savesCount > 0 && (
+                <span className={clsx('text-[10px] font-black', savesViewActive ? 'text-paper/80' : 'text-flame')}>
+                  {savesCount}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Categories */}
         <div className="px-6 pt-5 pb-2">
           <span className="text-night/30 dark:text-paper/30 text-[10px] uppercase tracking-brand font-black">
@@ -211,6 +248,21 @@ export default function Sidebar({
           )}
         </div>
       </div>
+
+      {/* Weekly digest subscribe button */}
+      {onOpenSubscribe && (
+        <div className="px-4 pt-3">
+          <button
+            onClick={onOpenSubscribe}
+            className="w-full flex items-center justify-center gap-2 border border-night/15 dark:border-paper/15 rounded-md px-3 py-2.5 text-[10px] uppercase tracking-brand font-black text-night/60 dark:text-paper/60 hover:text-flame hover:border-flame transition-colors"
+          >
+            <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2 3.5h12v9H2zM2 4l6 4 6-4" />
+            </svg>
+            {subscriberEmail ? 'Manage digest' : 'Email me weekly'}
+          </button>
+        </div>
+      )}
 
       {/* Footer nav */}
       <div className="px-4 py-4">

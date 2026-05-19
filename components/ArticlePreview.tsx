@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { CATEGORIES, type Article } from '@/lib/types';
 import { timeAgo } from '@/lib/weekUtils';
 import { format } from 'date-fns';
+import BookmarkButton from './BookmarkButton';
 
 interface Props {
   article: Article | null;
+  isBookmarked?: boolean;
+  onToggleBookmark?: () => void;
 }
 
-export default function ArticlePreview({ article }: Props) {
+export default function ArticlePreview({ article, isBookmarked = false, onToggleBookmark }: Props) {
   const [imageFailed, setImageFailed] = useState(false);
 
   // Reset image error state whenever the selected article changes
@@ -60,14 +63,19 @@ export default function ArticlePreview({ article }: Props) {
             <span className="text-flame text-sm font-black">{article.sourceName}</span>
           </div>
         </div>
-        <a
-          href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] font-black uppercase tracking-brand text-night/60 dark:text-paper/60 border border-night/15 dark:border-paper/15 hover:border-flame hover:text-flame px-3.5 py-2 rounded-md transition-colors"
-        >
-          Open ↗
-        </a>
+        <div className="flex items-center gap-2">
+          {onToggleBookmark && (
+            <BookmarkButton saved={isBookmarked} onToggle={onToggleBookmark} />
+          )}
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-black uppercase tracking-brand text-night/60 dark:text-paper/60 border border-night/15 dark:border-paper/15 hover:border-flame hover:text-flame px-3.5 py-2 rounded-md transition-colors"
+          >
+            Open ↗
+          </a>
+        </div>
       </div>
 
       {/* Body */}
