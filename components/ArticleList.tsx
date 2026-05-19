@@ -103,7 +103,7 @@ export default function ArticleList({
                         isFirstOverall ? 'pt-4' : 'pt-7'
                       )}
                     >
-                      <span className="text-[10px] uppercase tracking-brand font-black text-night/40 dark:text-paper/40 flex-shrink-0">
+                      <span className="text-sm font-black tracking-tight text-night/70 dark:text-paper/70 flex-shrink-0">
                         {dayLabel}
                       </span>
                       <span className="flex-1 h-px bg-night/10 dark:bg-paper/10" />
