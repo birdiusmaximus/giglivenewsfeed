@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 // @ts-expect-error - no types shipped with this package
 import googleNewsUrlDecoder from 'google-news-url-decoder';
+import { decodeHtmlEntities } from './textUtils';
 
 const { GoogleDecoder } = googleNewsUrlDecoder as { GoogleDecoder: new () => GoogleDecoderInstance };
 type GoogleDecoderInstance = {
@@ -146,7 +147,7 @@ export async function fetchOgMeta(url: string, timeoutMs = 8000): Promise<OgMeta
     ];
     for (const re of descRegexes) {
       const m = html.match(re);
-      if (m?.[1]) { description = m[1].trim().slice(0, 2000); break; }
+      if (m?.[1]) { description = decodeHtmlEntities(m[1].trim()).slice(0, 2000); break; }
     }
 
     // --- Video (iframes, og:video, twitter:player) ---
@@ -177,16 +178,19 @@ export async function fetchOgMeta(url: string, timeoutMs = 8000): Promise<OgMeta
       }
 
       if (!description || description.length < 200) {
-        const metaDesc = description ??
+        const rawMetaDesc = description ??
           $('meta[property="og:description"]').attr('content') ??
           $('meta[name="description"]').attr('content');
+        const metaDesc = rawMetaDesc ? decodeHtmlEntities(rawMetaDesc) : undefined;
 
-        // Extract body paragraphs for a richer multi-paragraph excerpt
+        // Extract body paragraphs for a richer multi-paragraph excerpt.
+        // cheerio's .text() decodes one level of entities, but some publishers
+        // serve double-encoded HTML — decode again to be safe.
         const bodyParas: string[] = [];
         const bodySelectors = ['article p', 'main p', '.post-content p', '.article-body p', '.entry-content p', '.story p'];
         for (const sel of bodySelectors) {
           $(sel).each((_, el) => {
-            const text = $(el).text().replace(/\s+/g, ' ').trim();
+            const text = decodeHtmlEntities($(el).text()).replace(/\s+/g, ' ').trim();
             if (text.length > 60) bodyParas.push(text);
           });
           if (bodyParas.length >= 6) break;

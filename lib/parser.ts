@@ -4,6 +4,7 @@ import type { Article } from './types';
 import { FEEDS, type FeedSource } from './feeds';
 import { detectCategory } from './categories';
 import { isCurrentWeek, isInWeek } from './weekUtils';
+import { decodeHtmlEntities } from './textUtils';
 import { enrichWithOgImages } from './ogImage';
 
 type RSSItem = {
@@ -76,12 +77,15 @@ function generateId(url: string): string {
 
 function cleanDescription(raw: string | undefined): string {
   if (!raw) return '';
-  // Preserve paragraph structure: convert closing block tags to newlines
-  // before stripping the rest, so the preview can render it as paragraphs.
-  return raw
+  // 1. Convert block tags to paragraph breaks before stripping
+  // 2. Strip remaining HTML tags
+  // 3. Decode HTML entities (handles nested &amp;amp; encoding)
+  // 4. Collapse whitespace while preserving paragraph breaks
+  const stripped = raw
     .replace(/<\/(p|div|h[1-6]|li|blockquote)>/gi, '\n\n')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<[^>]+>/g, '');
+  return decodeHtmlEntities(stripped)
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]*\n[ \t]*/g, '\n')
@@ -94,9 +98,11 @@ function cleanDescription(raw: string | undefined): string {
  * which we strip so the article title displays cleanly.
  */
 function cleanTitle(title: string, feed: FeedSource): string {
-  if (feed.type !== 'google-news') return title;
+  // Decode HTML entities first so titles like "Tesco&#39;s" render correctly
+  const decoded = decodeHtmlEntities(title);
+  if (feed.type !== 'google-news') return decoded;
   // Common patterns: "Title - Site Name" or "Title | Site Name"
-  return title
+  return decoded
     .replace(/\s+[-|–]\s+[^-|–]+$/, '') // strip trailing " - Source"
     .trim();
 }
