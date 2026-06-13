@@ -107,6 +107,30 @@ function cleanTitle(title: string, feed: FeedSource): string {
     .trim();
 }
 
+/**
+ * Reject entries that aren't real editorial articles. We've seen Google
+ * News surface AdAge's video archive (titles like `Uber_Cramped_15s`,
+ * `NFA_Send_Off_30_PR_H264`) and stray ripper-site URLs (yt5s.com etc.)
+ * sneaking in. These look broken in the feed and offer nothing useful.
+ */
+function isJunkEntry(title: string, url: string): boolean {
+  const t = title.trim();
+  // Empty or punctuation-only after source-name stripping
+  if (t.length < 5) return true;
+  if (/^[\s\-_•·.|]+$/.test(t)) return true;
+  // Video codec / format suffixes — telltale of raw file uploads
+  if (/_(H264|h264|HEVC|HD4K?|mp4|mov|wmv|avi|prores)\b/i.test(t)) return true;
+  // _<digits>s duration suffix (e.g. _15s, _30s)
+  if (/_\d{1,3}s\b/.test(t)) return true;
+  // Common video-production filename markers
+  if (/_(slideshow|animation|render|edit|final|export|cut|loop|master|review|approval)\b/i.test(t)) return true;
+  // Looks like a raw filename: 3+ underscores, no spaces
+  if (/^[^\s]+_[^\s]+_[^\s]+/.test(t) && !/\s/.test(t)) return true;
+  // YouTube ripper / mirror services in the URL
+  if (/\b(yt5s|y2mate|savefrom|9convert|ytmp3|x2download|onlyvideo)\.(com|net|io|to)\b/i.test(url)) return true;
+  return false;
+}
+
 export async function fetchAllArticles(): Promise<Article[]> {
   return fetchArticlesFromFeeds(FEEDS);
 }
@@ -154,6 +178,7 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[], weekId?: strin
       if (!rawTitle || !url) continue;
 
       const title = cleanTitle(rawTitle, feed);
+      if (isJunkEntry(title, url)) continue;
 
       articles.push({
         id: generateId(url),
