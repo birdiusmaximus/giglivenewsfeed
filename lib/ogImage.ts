@@ -65,18 +65,55 @@ const UA =
   '(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 
 /**
+ * Try to extract the source URL embedded inside the Google News article URL
+ * itself. The path segment after `articles/` is a base64-encoded protobuf
+ * blob; the source URL appears as UTF-8 text inside it. We scan the decoded
+ * bytes for the first https:// URL that isn't a Google domain.
+ */
+function decodeGoogleNewsUrl(url: string): string | null {
+  try {
+    const match = url.match(/news\.google\.com\/(?:rss\/)?articles\/([\w-]+)/);
+    if (!match) return null;
+    const segment = match[1];
+    // base64url -> bytes -> binary string scan
+    const decoded = Buffer.from(segment, 'base64url').toString('binary');
+    const urlPattern = /(https?:\/\/[A-Za-z0-9._~:\/?#\[\]@!$&'()*+,;=%-]{8,})/g;
+    let m: RegExpExecArray | null;
+    while ((m = urlPattern.exec(decoded)) !== null) {
+      const candidate = m[1];
+      if (
+        !candidate.includes('google.com') &&
+        !candidate.includes('googleapis.com') &&
+        !candidate.includes('gstatic.com')
+      ) {
+        // Trim any trailing junk bytes that snuck through the regex
+        return candidate.replace(/[^\x20-\x7e]+.*$/, '');
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+/**
  * Google News RSS wraps each article URL in `news.google.com/rss/articles/...`.
- * Resolution strategy:
- *   1. Follow HTTP redirects — some Google News URLs 302 straight to the
- *      publisher. Cheapest, fastest path.
- *   2. If the redirect chain stays on news.google.com, parse the landing-
- *      page HTML for common embedded-redirect patterns (data attrs, meta
- *      refreshes, JS location replaces, canonical links).
- *   3. Give up and return the original URL — article is still openable, we
- *      just lose richer enrichment.
+ * Resolution strategy (cheapest first):
+ *   1. base64-decode the URL segment and pull out the embedded source URL.
+ *      Works for ~most modern Google News URLs without any network call.
+ *   2. Follow HTTP redirects — some URLs 302 to the publisher.
+ *   3. Parse the landing-page HTML for embedded-redirect patterns.
+ *   4. Give up and return the original — article still opens, no rich
+ *      enrichment.
  */
 export async function resolveUrl(url: string): Promise<string> {
   if (!url.includes('news.google.com')) return url;
+
+  // 1. Direct base64 decode of the URL
+  const decoded = decodeGoogleNewsUrl(url);
+  if (decoded) return decoded;
+
+  // 2. + 3. HTTP fetch / landing-page parse
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
@@ -92,11 +129,10 @@ export async function resolveUrl(url: string): Promise<string> {
       return res.url;
     }
 
-    // Parse landing-page HTML for embedded source URLs
     const html = (await res.text()).slice(0, 80_000);
     const patterns = [
-      /data-n-au="([^"]+)"/,                                   // Google News data attr
-      /<a[^>]+jslog="[^"]*"[^>]+href="(https?:\/\/[^"]+)"/,    // Article link
+      /data-n-au="([^"]+)"/,
+      /<a[^>]+jslog="[^"]*"[^>]+href="(https?:\/\/[^"]+)"/,
       /<meta[^>]+http-equiv=["']refresh["'][^>]+content=["']\d+;\s*url=([^"']+)["']/i,
       /window\.location(?:\.replace)?\s*=\s*["'](https?:\/\/[^"']+)["']/,
       /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i,
