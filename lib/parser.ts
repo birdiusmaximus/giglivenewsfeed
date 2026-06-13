@@ -192,7 +192,7 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[], weekId?: strin
   // running it on 100+ articles in parallel can blow the 1GB Vercel Hobby
   // function memory cap and 500 the page. 50 newest articles is plenty of
   // breadth for the home feed.
-  const TOP_FOR_ENRICHMENT = 50;
+  const TOP_FOR_ENRICHMENT = 75;
   const toEnrich = filtered.slice(0, TOP_FOR_ENRICHMENT);
 
   // Concurrency of 3 keeps peak memory well under the function limit while
