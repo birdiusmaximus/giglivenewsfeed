@@ -245,19 +245,13 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[], weekId?: strin
     if (a.imageUrl) imageCounts.set(a.imageUrl, (imageCounts.get(a.imageUrl) ?? 0) + 1);
   }
 
-  // Don't drop articles based on image quality — strip bad URLs instead so
-  // the UI can render a source-coloured fallback. Dropping articles entirely
-  // meant Google-News-proxied sources (~half our feed list) returned nothing
-  // because their landing pages don't yield a clean og:image.
-  return enriched.map((a) => {
-    if (a.videoUrl) return a;
-    if (!a.imageUrl) return a;
-    if (GENERIC_IMAGE_PATTERNS.some((re) => re.test(a.imageUrl!))) {
-      return { ...a, imageUrl: undefined };
-    }
-    if ((imageCounts.get(a.imageUrl) ?? 0) > 1) {
-      return { ...a, imageUrl: undefined };
-    }
-    return a;
+  // Drop articles without a usable image. Video-bearing articles bypass
+  // since the video player carries the visual weight.
+  return enriched.filter((a) => {
+    if (a.videoUrl) return true;
+    if (!a.imageUrl) return false;
+    if (GENERIC_IMAGE_PATTERNS.some((re) => re.test(a.imageUrl!))) return false;
+    if ((imageCounts.get(a.imageUrl) ?? 0) > 1) return false;
+    return true;
   });
 }
