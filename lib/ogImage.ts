@@ -66,11 +66,14 @@ const UA =
 
 /**
  * Google News RSS wraps each article URL in `news.google.com/rss/articles/...`.
- * Many of these wrapped URLs redirect (HTTP 302) to the actual publisher when
- * fetched with a browser User-Agent; we follow the redirect chain and return
- * the resolved URL. If the chain doesn't escape news.google.com, return the
- * original URL as a graceful fallback — the article is still openable, we
- * just won't get a clean og:image from the wrapped landing page.
+ * Resolution strategy:
+ *   1. Follow HTTP redirects — some Google News URLs 302 straight to the
+ *      publisher. Cheapest, fastest path.
+ *   2. If the redirect chain stays on news.google.com, parse the landing-
+ *      page HTML for common embedded-redirect patterns (data attrs, meta
+ *      refreshes, JS location replaces, canonical links).
+ *   3. Give up and return the original URL — article is still openable, we
+ *      just lose richer enrichment.
  */
 export async function resolveUrl(url: string): Promise<string> {
   if (!url.includes('news.google.com')) return url;
@@ -84,9 +87,25 @@ export async function resolveUrl(url: string): Promise<string> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    const finalUrl = res.url;
-    if (finalUrl && !finalUrl.includes('news.google.com')) {
-      return finalUrl;
+
+    if (res.url && !res.url.includes('news.google.com')) {
+      return res.url;
+    }
+
+    // Parse landing-page HTML for embedded source URLs
+    const html = (await res.text()).slice(0, 80_000);
+    const patterns = [
+      /data-n-au="([^"]+)"/,                                   // Google News data attr
+      /<a[^>]+jslog="[^"]*"[^>]+href="(https?:\/\/[^"]+)"/,    // Article link
+      /<meta[^>]+http-equiv=["']refresh["'][^>]+content=["']\d+;\s*url=([^"']+)["']/i,
+      /window\.location(?:\.replace)?\s*=\s*["'](https?:\/\/[^"']+)["']/,
+      /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i,
+    ];
+    for (const re of patterns) {
+      const m = html.match(re);
+      if (m?.[1] && !m[1].includes('news.google.com')) {
+        return m[1];
+      }
     }
   } catch {
     // fall through
