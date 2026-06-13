@@ -186,10 +186,18 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[], weekId?: strin
   // Remove industry news — too agency/business-focused for a creative digest.
   const filtered = unique.filter((a) => a.category !== 'industry-news');
 
-  // Backfill OG images for any article that didn't have one in the RSS feed
-  // (Adweek, Abduzeedo, Google-News-proxied sources). This adds ~3-6s on
-  // cold load but is cached for 30 min via revalidate / persisted via cron.
-  const enriched = await enrichWithOgImages(filtered, 8);
+  // Cap articles entering the heavy enrichment pipeline. Each article gets a
+  // JSDOM-backed Readability pass + image HEAD verification + (sometimes)
+  // Vimeo oEmbed call. JSDOM is memory-hungry (~150-250MB per instance), so
+  // running it on 100+ articles in parallel can blow the 1GB Vercel Hobby
+  // function memory cap and 500 the page. 50 newest articles is plenty of
+  // breadth for the home feed.
+  const TOP_FOR_ENRICHMENT = 50;
+  const toEnrich = filtered.slice(0, TOP_FOR_ENRICHMENT);
+
+  // Concurrency of 3 keeps peak memory well under the function limit while
+  // still parallelising enough to finish the cold path in 20-30s.
+  const enriched = await enrichWithOgImages(toEnrich, 3);
 
   // Drop articles without a unique, article-specific image.
   // Two signals:
