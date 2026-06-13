@@ -93,4 +93,63 @@ export const FEEDS: FeedSource[] = [
     color: '#F45347',
     type: 'google-news',
   },
+  {
+    id: 'muse-by-clio',
+    name: 'Muse by Clio',
+    url: 'https://musebycl.io',
+    rssUrl: gnews('musebycl.io'),
+    color: '#F45347',
+    type: 'google-news',
+  },
+  {
+    id: 'behance',
+    name: 'Behance',
+    url: 'https://www.behance.net',
+    rssUrl: gnews('behance.net'),
+    color: '#DEA8F4',
+    type: 'google-news',
+  },
+  {
+    id: 'vimeo-staff-picks',
+    name: 'Vimeo Staff Picks',
+    // The Staff Picks channel exposes a direct RSS feed at /videos/rss.
+    // Far better than a Google News proxy here — we get curated picks
+    // straight from Vimeo's editorial team rather than press coverage.
+    url: 'https://vimeo.com/channels/staffpicks',
+    rssUrl: 'https://vimeo.com/channels/staffpicks/videos/rss',
+    color: '#DEA8F4',
+  },
+  {
+    id: 'design-week',
+    name: 'Design Week',
+    url: 'https://www.designweek.co.uk',
+    rssUrl: gnews('designweek.co.uk'),
+    color: '#FFBF3F',
+    type: 'google-news',
+  },
+  {
+    id: 'inspiration-grid',
+    name: 'The Inspiration Grid',
+    url: 'https://theinspirationgrid.com',
+    rssUrl: gnews('theinspirationgrid.com'),
+    color: '#F45347',
+    type: 'google-news',
+  },
+  {
+    id: 'd-and-ad',
+    name: 'D&AD',
+    url: 'https://www.dandad.org',
+    rssUrl: gnews('dandad.org'),
+    color: '#00AE97',
+    type: 'google-news',
+  },
+  {
+    id: 'adage',
+    name: 'Ad Age',
+    url: 'https://adage.com',
+    rssUrl: gnews('adage.com'),
+    color: '#DEA8F4',
+    type: 'google-news',
+    paywallPhrases: ['ad age premium', 'subscriber exclusive', 'subscribe to read'],
+  },
 ];

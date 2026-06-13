@@ -249,21 +249,6 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Weekly digest subscribe button */}
-      {onOpenSubscribe && (
-        <div className="px-4 pt-3">
-          <button
-            onClick={onOpenSubscribe}
-            className="w-full flex items-center justify-center gap-2 border border-night/15 dark:border-paper/15 rounded-md px-3 py-2.5 text-[10px] uppercase tracking-brand font-black text-night/60 dark:text-paper/60 hover:text-flame hover:border-flame transition-colors"
-          >
-            <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 3.5h12v9H2zM2 4l6 4 6-4" />
-            </svg>
-            {subscriberEmail ? 'Manage digest' : 'Email me weekly'}
-          </button>
-        </div>
-      )}
-
       {/* Footer nav */}
       <div className="px-4 py-4">
         {isArchive ? (
