@@ -220,9 +220,12 @@ export async function fetchArticlesFromFeeds(feeds: FeedSource[], weekId?: strin
   const TOP_FOR_ENRICHMENT = 75;
   const toEnrich = filtered.slice(0, TOP_FOR_ENRICHMENT);
 
-  // Concurrency of 3 keeps peak memory well under the function limit while
-  // still parallelising enough to finish the cold path in 20-30s.
-  const enriched = await enrichWithOgImages(toEnrich, 3);
+  // Concurrency of 6 — with 75 articles per cold load and a 60s Vercel
+  // function timeout, 3-wide was leaving 30-50% of articles unenriched
+  // (so they were dropped by the image-required filter). 6-wide keeps
+  // peak JSDOM memory around 1.2-1.5GB which is fine for the runtime,
+  // and finishes the queue in ~25-35s on the cold path.
+  const enriched = await enrichWithOgImages(toEnrich, 6);
 
   // Drop articles without a unique, article-specific image.
   // Two signals:
