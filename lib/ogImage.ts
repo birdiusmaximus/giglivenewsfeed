@@ -1,8 +1,6 @@
 import * as cheerio from 'cheerio';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
-// @ts-expect-error - no types shipped with this package
-import googleNewsUrlDecoder from 'google-news-url-decoder';
 import { decodeHtmlEntities } from './textUtils';
 
 /**
@@ -62,26 +60,34 @@ function extractWithReadability(html: string, url: string): string | undefined {
   }
 }
 
-const { GoogleDecoder } = googleNewsUrlDecoder as { GoogleDecoder: new () => GoogleDecoderInstance };
-type GoogleDecoderInstance = {
-  decode(url: string): Promise<{ status: boolean; decoded_url?: string }>;
-};
-const gnDecoder = new GoogleDecoder();
-
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 
 /**
- * Google News RSS wraps each article URL in `news.google.com/rss/articles/...`
- * which redirects to a GDPR consent page when fetched server-side. This
- * decoder unwraps the embedded source URL so we can fetch the real article.
+ * Google News RSS wraps each article URL in `news.google.com/rss/articles/...`.
+ * Many of these wrapped URLs redirect (HTTP 302) to the actual publisher when
+ * fetched with a browser User-Agent; we follow the redirect chain and return
+ * the resolved URL. If the chain doesn't escape news.google.com, return the
+ * original URL as a graceful fallback — the article is still openable, we
+ * just won't get a clean og:image from the wrapped landing page.
  */
 export async function resolveUrl(url: string): Promise<string> {
   if (!url.includes('news.google.com')) return url;
   try {
-    const result = await gnDecoder.decode(url);
-    if (result.status && result.decoded_url) return result.decoded_url;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const finalUrl = res.url;
+    if (finalUrl && !finalUrl.includes('news.google.com')) {
+      return finalUrl;
+    }
   } catch {
     // fall through
   }

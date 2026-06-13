@@ -6,17 +6,11 @@ const nextConfig = {
       { protocol: 'http', hostname: '**' },
     ],
   },
-  // Don't bundle these packages — they include ESM-only files (e.g.
-  // @exodus/bytes inside google-news-url-decoder) which crash at runtime
-  // when require()'d by Next.js's default CommonJS bundling. Letting Node
-  // resolve them itself at runtime keeps ESM/CJS interop correct.
+  // Leave heavy server-only packages unbundled so Next.js doesn't try to
+  // pack them through webpack. jsdom + Readability are large and contain
+  // dynamic requires that don't bundle cleanly.
   experimental: {
-    serverComponentsExternalPackages: [
-      'google-news-url-decoder',
-      '@mozilla/readability',
-      'jsdom',
-      '@vercel/kv',
-    ],
+    serverComponentsExternalPackages: ['@mozilla/readability', 'jsdom'],
   },
 };
 
