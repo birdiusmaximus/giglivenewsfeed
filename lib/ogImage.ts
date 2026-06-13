@@ -97,13 +97,38 @@ function decodeGoogleNewsUrl(url: string): string | null {
 }
 
 /**
+ * Lazy-loaded handle to the upstream decoder package. Use a dynamic import
+ * inside a try/catch so any module-init crash (e.g. the @exodus/bytes ESM
+ * issue we hit before) gets caught and we fall through to next strategy
+ * instead of taking down the request.
+ */
+let gnDecoderPromise: Promise<{ decode: (u: string) => Promise<{ status: boolean; decoded_url?: string }> } | null> | null = null;
+function loadGnDecoder() {
+  if (gnDecoderPromise) return gnDecoderPromise;
+  gnDecoderPromise = (async () => {
+    try {
+      // @ts-expect-error - no types
+      const mod = await import('google-news-url-decoder');
+      const Cls = (mod as { GoogleDecoder?: new () => unknown }).GoogleDecoder ??
+        (mod as { default?: { GoogleDecoder?: new () => unknown } }).default?.GoogleDecoder;
+      if (!Cls) return null;
+      return new (Cls as new () => { decode: (u: string) => Promise<{ status: boolean; decoded_url?: string }> })();
+    } catch {
+      return null;
+    }
+  })();
+  return gnDecoderPromise;
+}
+
+/**
  * Google News RSS wraps each article URL in `news.google.com/rss/articles/...`.
  * Resolution strategy (cheapest first):
- *   1. base64-decode the URL segment and pull out the embedded source URL.
- *      Works for ~most modern Google News URLs without any network call.
- *   2. Follow HTTP redirects — some URLs 302 to the publisher.
- *   3. Parse the landing-page HTML for embedded-redirect patterns.
- *   4. Give up and return the original — article still opens, no rich
+ *   1. base64-decode the URL segment locally — no network, instant.
+ *   2. google-news-url-decoder package — handles formats our base64 path
+ *      can't, but is dynamically imported in case it crashes on this runtime.
+ *   3. Follow HTTP redirects — some URLs 302 to the publisher.
+ *   4. Parse the landing-page HTML for embedded-redirect patterns.
+ *   5. Give up and return the original — article still opens, no rich
  *      enrichment.
  */
 export async function resolveUrl(url: string): Promise<string> {
@@ -112,6 +137,18 @@ export async function resolveUrl(url: string): Promise<string> {
   // 1. Direct base64 decode of the URL
   const decoded = decodeGoogleNewsUrl(url);
   if (decoded) return decoded;
+
+  // 2. Try the upstream decoder package — guarded so a load failure
+  //    doesn't crash the request.
+  try {
+    const dec = await loadGnDecoder();
+    if (dec) {
+      const result = await dec.decode(url);
+      if (result.status && result.decoded_url) return result.decoded_url;
+    }
+  } catch {
+    // decoder crashed mid-call — fall through
+  }
 
   // 2. + 3. HTTP fetch / landing-page parse
   try {
