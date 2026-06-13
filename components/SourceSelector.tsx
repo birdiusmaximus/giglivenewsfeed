@@ -113,11 +113,11 @@ export default function SourceSelector({ open, onClose, prefs, onChange }: Props
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night/70 backdrop-blur-sm animate-backdrop-enter"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg max-h-[85vh] bg-white dark:bg-dusk rounded-lg shadow-2xl flex flex-col overflow-hidden border border-night/10 dark:border-paper/10"
+        className="w-full max-w-lg max-h-[85vh] bg-white dark:bg-dusk rounded-lg shadow-2xl flex flex-col overflow-hidden border border-night/10 dark:border-paper/10 animate-modal-enter"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -200,7 +200,7 @@ export default function SourceSelector({ open, onClose, prefs, onChange }: Props
                 <button
                   onClick={validate}
                   disabled={busy || !urlInput.trim()}
-                  className="px-5 py-2.5 rounded-md bg-flame text-paper text-[11px] font-black uppercase tracking-brand hover:bg-flame/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="press-soft px-5 py-2.5 rounded-md bg-flame text-paper text-[11px] font-black uppercase tracking-brand hover:bg-flame/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   {busy ? '…' : 'Find'}
                 </button>
@@ -236,13 +236,13 @@ export default function SourceSelector({ open, onClose, prefs, onChange }: Props
               <div className="flex gap-2">
                 <button
                   onClick={() => { setPreview(null); setError(null); }}
-                  className="flex-1 px-4 py-2.5 rounded-md border border-night/15 dark:border-paper/15 text-night/60 dark:text-paper/60 text-[11px] font-black uppercase tracking-brand hover:text-flame hover:border-flame transition-colors"
+                  className="press-soft flex-1 px-4 py-2.5 rounded-md border border-night/15 dark:border-paper/15 text-night/60 dark:text-paper/60 text-[11px] font-black uppercase tracking-brand hover:text-flame hover:border-flame transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmAdd}
-                  className="flex-1 px-4 py-2.5 rounded-md bg-flame text-paper text-[11px] font-black uppercase tracking-brand hover:bg-flame/85 transition-colors"
+                  className="press-soft flex-1 px-4 py-2.5 rounded-md bg-flame text-paper text-[11px] font-black uppercase tracking-brand hover:bg-flame/85 transition-colors"
                 >
                   Add Source
                 </button>

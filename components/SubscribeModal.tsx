@@ -91,11 +91,11 @@ export default function SubscribeModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night/70 backdrop-blur-sm animate-backdrop-enter"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white dark:bg-dusk rounded-lg shadow-2xl border border-night/10 dark:border-paper/10 overflow-hidden"
+        className="w-full max-w-md bg-white dark:bg-dusk rounded-lg shadow-2xl border border-night/10 dark:border-paper/10 overflow-hidden animate-modal-enter"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-5 border-b border-night/8 dark:border-paper/10 flex items-center justify-between">
@@ -133,7 +133,7 @@ export default function SubscribeModal({
               <button
                 onClick={unsubscribe}
                 disabled={busy}
-                className="w-full px-4 py-2.5 rounded-md border border-night/15 dark:border-paper/15 text-night/60 dark:text-paper/60 text-[11px] font-black uppercase tracking-brand hover:text-flame hover:border-flame transition-colors disabled:opacity-50"
+                className="press-soft w-full px-4 py-2.5 rounded-md border border-night/15 dark:border-paper/15 text-night/60 dark:text-paper/60 text-[11px] font-black uppercase tracking-brand hover:text-flame hover:border-flame transition-colors disabled:opacity-50"
               >
                 {busy ? 'Removing…' : 'Unsubscribe'}
               </button>
@@ -156,7 +156,7 @@ export default function SubscribeModal({
                 <button
                   onClick={subscribe}
                   disabled={busy || !email.trim()}
-                  className="px-5 py-2.5 rounded-md bg-flame text-paper text-[11px] font-black uppercase tracking-brand hover:bg-flame/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="press-soft px-5 py-2.5 rounded-md bg-flame text-paper text-[11px] font-black uppercase tracking-brand hover:bg-flame/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   {busy ? '…' : 'Subscribe'}
                 </button>

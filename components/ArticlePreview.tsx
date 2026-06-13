@@ -71,16 +71,17 @@ export default function ArticlePreview({ article, isBookmarked = false, onToggle
             href={article.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] font-black uppercase tracking-brand text-night/60 dark:text-paper/60 border border-night/15 dark:border-paper/15 hover:border-flame hover:text-flame px-3.5 py-2 rounded-md transition-colors"
+            className="press-soft text-[10px] font-black uppercase tracking-brand text-night/60 dark:text-paper/60 border border-night/15 dark:border-paper/15 hover:border-flame hover:text-flame px-3.5 py-2 rounded-md"
           >
             Open ↗
           </a>
         </div>
       </div>
 
-      {/* Body */}
+      {/* Body — keyed on article.id so React remounts and the enter
+          animation runs each time a different article is selected. */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-7">
+        <div className="p-7 animate-preview-enter" key={article.id}>
           {/* Hero — video takes priority, then image, then gradient fallback */}
           {hasVideo ? (
             <div className="aspect-video rounded-lg overflow-hidden bg-black mb-6 relative">
@@ -197,7 +198,7 @@ export default function ArticlePreview({ article, isBookmarked = false, onToggle
             href={article.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-flame text-paper text-xs font-black uppercase tracking-brand px-6 py-3.5 rounded-md hover:bg-night dark:hover:bg-paper dark:hover:text-night transition-colors"
+            className="press-soft inline-flex items-center gap-2 bg-flame text-paper text-xs font-black uppercase tracking-brand px-6 py-3.5 rounded-md hover:bg-night dark:hover:bg-paper dark:hover:text-night"
           >
             Read on {article.sourceName} →
           </a>

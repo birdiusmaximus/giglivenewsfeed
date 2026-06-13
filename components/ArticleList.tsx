@@ -55,17 +55,22 @@ export default function ArticleList({
             </span>
           </div>
           <div className="flex items-center gap-3">
-            {customLoading && (
-              <span className="text-[10px] uppercase tracking-brand font-black text-flame animate-pulse">
-                Loading…
-              </span>
-            )}
             {onOpenSourceSelector && (
               <button
                 onClick={onOpenSourceSelector}
-                className="text-[10px] uppercase tracking-brand font-black text-night/60 dark:text-paper/60 border border-night/15 dark:border-paper/15 hover:border-flame hover:text-flame px-3 py-1.5 rounded-md transition-colors"
+                className={clsx(
+                  'press-soft text-[10px] uppercase tracking-brand font-black px-3 py-1.5 rounded-md flex items-center gap-1.5 border',
+                  customLoading
+                    ? 'animate-flame-pulse text-flame border-flame/60'
+                    : 'text-night/60 dark:text-paper/60 border-night/15 dark:border-paper/15 hover:border-flame hover:text-flame'
+                )}
               >
-                Sources
+                {customLoading && (
+                  <svg viewBox="0 0 16 16" className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M8 1.5a6.5 6.5 0 1 1-4.6 1.9" />
+                  </svg>
+                )}
+                <span>{customLoading ? 'Updating' : 'Sources'}</span>
               </button>
             )}
             <span className="text-[10px] uppercase tracking-brand font-black text-night/40 dark:text-paper/40">

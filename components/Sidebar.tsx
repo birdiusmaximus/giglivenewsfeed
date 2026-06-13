@@ -100,7 +100,7 @@ export default function Sidebar({
             <button
               onClick={onToggleSavesView}
               className={clsx(
-                'w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-brand transition-all text-left relative',
+                'press-soft w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-brand text-left relative',
                 savesViewActive
                   ? 'bg-flame text-paper'
                   : 'border border-night/10 dark:border-paper/10 text-night/70 dark:text-paper/70 hover:border-flame hover:text-flame'
@@ -138,7 +138,7 @@ export default function Sidebar({
                 onClick={() => !disabled && onCategoryChange(cat.id)}
                 disabled={disabled}
                 className={clsx(
-                  'w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-brand transition-all text-left relative',
+                  'press-soft w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-brand text-left relative',
                   isActive
                     ? 'bg-paper dark:bg-night text-night dark:text-paper'
                     : disabled
@@ -181,7 +181,7 @@ export default function Sidebar({
                 <button
                   onClick={() => onKeywordFilterChange(isActive ? null : kf.id)}
                   className={clsx(
-                    'w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-brand transition-all text-left relative',
+                    'press-soft w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-brand text-left relative',
                     isActive
                       ? 'bg-paper dark:bg-night text-night dark:text-paper'
                       : 'text-night/55 dark:text-paper/55 hover:bg-paper/60 dark:hover:bg-night/60 hover:text-night dark:hover:text-paper'
